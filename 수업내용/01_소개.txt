@@ -217,3 +217,71 @@ sum을 local 변수로 해야 하는가?
 
 병렬 컴퓨팅이란?
 - 여러 개의 코어를 사용하여 프로그램의 성능을 높힌다.
+
+
+멀티쓰레드 프로그래밍의 사용처
+- 과학 기술 계산
+- 멀티미디어
+	. Encoding & Decoding
+	. 멀티쓰레드의 구현이 매우 쉬움 (독립된 장면들 - keyframe 단위)
+- 게임
+	. 온라인 게임 서버 (1997년부터)
+	. 3D 게임 엔진 (2000년대 중반 부터)
+
+멀티쓰레드 프로그래밍의 종류
+- Heterogeneous 멀티쓰레딩
+	. 쓰레드마다 맡은 역할이 다르다.
+	. 다른 Code Part를 실행
+	. 쓰레드간의 Load Balancing이 힘들다.
+	. 병렬성이 제한된다.
+- Homogeneous 멀티쓰레딩
+	. Data/Event Driven 프로그래밍
+	. 모든 쓰레드는 Symmetric하다.
+	  - Available한 순서대로 다음 작업을 처리한다.
+	  - 게임서버에 배틀 쓰레드, 힐 쓰레드 이런거 없다.
+	. 자동적인 load balancing, 제한없는 병렬성
+	. 작업 분배 Queue를 비롯한 일반적인 병렬 자료구조 필요
+	. 모든 쓰레드가 Data Race에 노출되어 있다.
+
+MMORPG Game Server
+- Massively Multiplayer Online Roll Playing Game
+- 한 개의 서버 프로세스에 5000명 이상의 사용자가 동시 접속해서 게임 실행
+- 게임 서버는 가상 환경을 시뮬레이션하는 네트워크 이벤트 시뮬레이터
+	. 5000명 플레이어 (소켓)
+	. 수십만 몬스터 (AI)
+	. 20km x 20km 월드 (충돌체크, 길찾기)
+- Windows에서 제공하는 멀티쓰레드+네트워크 I/O API인 IOCP 사용
+	. 일반적인 Select() 함수로는 몇천개의 socket을 관리할 수 없음.
+	. socket 하나당 하나의 쓰레드는 운영체제의 과부하
+	. Linux나 iOS는 epoll 또는 kqueue 사용
+	  2019년 Linux io-uring 추가
+- Time Consuming 작업 및 Blocking 작업들의 재배치
+	. Throughput과 함께 response time도 중요
+	. 따라서 라운드 로빈 알고리즘 사용
+- Homogemeous Multithreading
+	. Worker Thread의 pool 사용
+	. socket을 통해 packet이 올 때 마다, OS가 thread pool의 thread르
+	  하나 깨워서 packet의 처리를 맡김.
+	. HW Core 개수 1.5배의 worker threads
+	  - I/O 블로킹 고려
+	  - 정해져 있지 않음. 벤치마킹을 통해 조절
+	. Network 데이터 처리 뿐만 아니라 AI 루틴도 Worker Thread에서 처리
+	  - 모든 time consuming 작업은 병렬로 처리
+- 멀티쓰레드 트릭 #1 : Database Query
+	. 문제 : Database 쿼리는 쓰레드의 Blocking을 초래
+	. 해결 : Blocking 전용 쓰레드를 따로 두어서, 작업 전달
+- 멀티쓰레드 트릭 #2 : NPC AI
+	. 문제 : NPC가 너무 많다
+	. 해결 : Timer Thread를 사용하여, active한 NPC의 active event만 처리
+- Worst Case Tuning
+	. 게임서버의 목적 : 동접을 높히는 것
+	. 평상시의 CPU낭비 OK, 최대 부하일 때 잘 버티도록 프로그램 설계
+- 컨테이너 자료구조를 사용한 객체간 동기화
+	. Queue, Priority Queue, Set
+	  - 그냥 쓰면 안된다. 멀티쓰레드랑 관계 없는 컨테이너
+	. Custom 자료구조
+	  - 1 write/multi reader queue
+- Thread & Cache Affinity
+	. 쓰레드가 코어를 바꿔 가면서 실행되면 성능에 좋지 않다.
+	. 쓰레드가 사용할 코어를 지정해 줄 수 있다.
+	. 하지 말자.
