@@ -4,16 +4,16 @@
 #include <atomic>
 using namespace std;
 
-volatile bool done;
-int* bound;
+volatile bool done = false;
+int* volatile bound;
 int g_error;
 
 void Func0()
 {
 	for (int i = 0; i < 25000000; ++i) {
 		*bound = -(1 + *bound);
-		done = true;
 	}
+	done = true;
 }
 
 void Func1()

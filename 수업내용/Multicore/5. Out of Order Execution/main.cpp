@@ -22,7 +22,7 @@ void Func1(int n)
 {
 	for (int i = 0; i < SIZE; ++i) {
 		y = i;
-		trace_x[i] = y;
+		trace_x[i] = x;
 	}
 }
 
