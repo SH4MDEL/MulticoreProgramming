@@ -4,7 +4,7 @@
 #include <atomic>
 using namespace std;
 
-volatile int victim = 0;
+atomic_int victim = 0;
 volatile bool flag[2] = { false, false };
 
 void Lock(int myID) {
@@ -12,8 +12,6 @@ void Lock(int myID) {
 	flag[myID] = true;
 
 	victim = myID;
-
-	atomic_thread_fence(memory_order_seq_cst);
 
 	while (flag[other] && victim == myID) {}
 }
@@ -45,5 +43,13 @@ int main()
 	cout << chrono::duration_cast<chrono::milliseconds>(d).count()
 		<< " millisec, ans : " << sum << endl;
 
-	// 약 2000ms
+	// atomic_int victim = 0;
+	// atomic_bool flag[2] = { false, false };
+	// 약 4000 ms
+	// 적절한 위치에 atomic_thread_fence를 넣은 것보다 느리다.
+
+	// atomic_int victim = 0;
+	// volatile bool flag[2] = { false, false };
+	// 약 3300 ms
+
 }
