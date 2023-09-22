@@ -1,0 +1,38 @@
+논 블로킹 프로그램을 해야 한다.
+이를 직접 구현하려면 CAS를 사용해야 한다.
+
+정리
+- 성능 향상을 위해 멀티쓰레드 프로그래밍을 해야 한다.
+	. Data Race가 발생한다.
+- Data Race를 최소화 해야 한다.
+	. Data Race는 모든 오동작의 근원
+- 어쩔 수 없이 남은 Data Race를 Lock 없이 해결해야 한다.
+	. Data Race를 모두 없앨 수 없다.
+	. Lock으로 해결하는 것은 성능 페널티가 크다.
+- Data Race는 공유 객체 때문에 발생한다.
+	. int, float, struct, class, container
+- Non-Blocking 멀티쓰레드 객체가 필요하다.
+- CAS를 사용하면 모든 일반 자료구조를 Multithread Lock-Free 자료구조로 변환할 수 있다.
+- 효율적인 변환은 상당한 프로그래밍 노력을 필요로 한다.
+
+atomic_compare_exchange_strong(addr, &expected, new_val);
+- expected의 값이 바뀐다.
+- atomic_compare_exchange_weak
+	. expected의 값이 바뀌지 않기도 한다.
+	. 사용하지 않을 것
+	. ARM, x86 CPU에 따라 동작 방식이 다르다.
+
+CAS
+- mutex를 구현하기 위해 고안됨.
+- CAS를 이용한 스핀락이 mutex보다 느린 이유
+	. convoying 때문.
+	. lock을 얻은 쓰레드가 context switch 당해 작업을 중단한다.
+	. this_thread::yield()를 통해 개선 가능
+
+- 빠르고 정확한 병렬 프로그램을 작성하는 것은 어렵다
+	. 포기하라
+- 포기하는 것이 불가능하면 주의해서 프로그래밍 하라
+	. atomic 변수나 mfence의 도움 필요
+- 쓰레드 간의 동기화를 위한 자료구조가 필요하다
+	. Non-Blocking 자료구조가 필수이다.
+	. Non-Blocking 자료구조에는 CAS가 필수이다.
