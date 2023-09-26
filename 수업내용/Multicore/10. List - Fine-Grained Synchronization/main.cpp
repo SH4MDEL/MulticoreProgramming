@@ -157,6 +157,7 @@ void Worker(int num_thread)
 
 int main()
 {
+	cout << "세밀한 동기화 (Fine-Grained Synchronization)" << endl;
 	for (int i = 1; i <= 16; i *= 2) {
 		set.unsafe_clear();
 		vector<thread> v;

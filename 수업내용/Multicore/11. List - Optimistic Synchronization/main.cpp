@@ -37,19 +37,18 @@ public:
 	}
 	bool add(int x)
 	{
-		while (true) {
+		while (true) 
+		{
 			Node* prev = &head;
-			Node* current;
-			current = prev->next;
-			while (current->value < x) {
+			Node* current = prev->next;
+			while (current->value < x) 
+			{
 				prev = current;
 				current = current->next;
 			}
 			lock_guard<mutex> prevLock(prev->nlock);
 			lock_guard<mutex> currLock(current->nlock);
-			if (!validate(prev, current)) {
-				continue;
-			}
+			if (!validate(prev, current)) continue;
 			if (current->value == x) {
 				return false;
 			}
@@ -64,54 +63,49 @@ public:
 	}
 	bool remove(int x)
 	{
-		Node* prev = &head;
-		prev->lock();
-		Node* current;
-		current = prev->next;
-		current->lock();
-		while (current->value < x) {
-			prev->unlock();
-			prev = current;
-			current = current->next;
-			current->lock();
-		}
-		if (x == current->value) {
-			prev->next = current->next;
-			prev->unlock();
-			current->unlock();
-			delete current;
-			return true;
-		}
-		else {
-			prev->unlock();
-			current->unlock();
-			return false;
+		while (true) 
+		{
+			Node* prev = &head;
+			Node* current = prev->next;
+			while (current->value < x) 
+			{
+				prev = current;
+				current = current->next;
+			}
+			lock_guard<mutex> prevLock(prev->nlock);
+			lock_guard<mutex> currLock(current->nlock);
+			if (!validate(prev, current)) {
+				continue;
+			}
+			if (x == current->value) {
+				prev->next = current->next;
+				//delete current;
+				return true;
+			}
+			else {
+				return false;
+			}
 		}
 	}
 	bool contains(int x)
 	{
-		Node* prev = &head;
-		prev->lock();
-		Node* current;
-		current = prev->next;
-		current->lock();
-		while (current->value < x) {
-			prev->unlock();
-			prev = current;
-			current = current->next;
-			current->lock();
+		while (true) {
+			Node* prev = &head;
+			Node* current = prev->next;
+			while (current->value < x) {
+				prev = current;
+				current = current->next;
+			}
+			lock_guard<mutex> prevLock(prev->nlock);
+			lock_guard<mutex> currLock(current->nlock);
+			if (!validate(prev, current)) continue;
+			if (x == current->value) {
+				return true;
+			}
+			else {
+				return false;
+			}
 		}
-		if (x == current->value) {
-			prev->unlock();
-			current->unlock();
-			return true;
-		}
-		else {
-			prev->unlock();
-			current->unlock();
-			return false;
-		}
-
 	}
 	void unsafe_print()
 	{
@@ -166,6 +160,7 @@ void Worker(int num_thread)
 
 int main()
 {
+	cout << "낙천적 동기화 (Optimistic Synchronization)" << endl;
 	for (int i = 1; i <= 16; i *= 2) {
 		set.unsafe_clear();
 		vector<thread> v;

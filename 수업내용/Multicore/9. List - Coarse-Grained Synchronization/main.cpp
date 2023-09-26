@@ -131,6 +131,7 @@ void Worker(int num_thread)
 
 int main()
 {
+	cout << "성긴 동기화 (Coarse-Grained Synchronization)" << endl;
 	for (int i = 1; i <= 8; i *= 2) {
 		set.clear();
 		vector<thread> v;
