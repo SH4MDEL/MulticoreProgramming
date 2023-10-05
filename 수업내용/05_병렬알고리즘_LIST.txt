@@ -26,9 +26,8 @@
 	. Lock 하나로 동기화 객체 전체를 감싸는 경우
 	. 성능 향상이 있을 수가 없다.
 
-- 세밀한 동기화 (fine-grained synchronization)
-	. 전체 리스트를 한꺼번에 잠그는 것보다 개별 노드를 잠그는 것이
-	  병행성을 향상시킬 수 있다.
+세밀한 동기화 (fine-grained synchronization)
+- 전체 리스트를 한꺼번에 잠그는 것보다 개별 노드를 잠그는 것이 병행성을 향상시킬 수 있다.
 	  - 전체 리스트에 대한 잠금을 두는 것이 아니라, 각각의 노드에 잠금을 둔다.
 	  - Node에 Lock()과 Unlock() 메소드를 구현해야 한다.
 	  - Node의 next field를 변경할 경우에는 반드시 lock을 얻은 후 변경해야 한다.
@@ -74,6 +73,59 @@
 	. 기아상태를 겪는 경우는 흔치 않은 경우이기 때문에 실제로는 잘 동작할 가능성이 크다.
 
 
-- 게으른 동기화
-- 비멈춤 동기화
+게으른 동기화 (lazy synchronization)
+- 낙천적 동기화는 lock의 횟수는 비약적으로 감소했으나 리스트를 두 번 순회해야 한다는
+  눈에 보이는 오버헤드가 있다.
+- 이를 극복하여 다시 순회하지 않는 알고리즘을 작성하였다.
+	. validate()가 노드를 처음부터 다시 순회하지 않고 validation을 수행한다.
+	. prev와 curr의 잠금은 여전히 필요하다.
+- Contains() 메소드는 자주 호출되는 메소드인데 이 메소드를 wait-free로 만들 수 있으면 좋겠다.
+	. 목적이 아니라 부수효과에 가까움
+- 각 노드에 marked 필드를 추가하여 그 노드가 집합에서 제거되어 있는지 표시한다.
+	. marked가 true이면 제거되었다는 표시
+	. marking을 실제 제거보다 반드시 먼저 수행한다.
+	  - 또한 marking은 잠금을 획득한 후 수행된다.
+	. 순회를 할 때 대상 노드를 잠글 필요가 없고 노드가 head에서 접근할 수 있는지 확인하기 위해
+	  전체 리스트를 다시 순회하지 않아도 된다.
+- 다음 명제가 반드시 성립한다.
+	. marking되어있지 않은 모든 Node는 실제 리스트에 존재하는 살아있는 Node이다.
+	. validate에서의 marking 검사는 locking 이후에 이루어지므로 validate가 OK이면 안전하다.
+
+- 단점
+	. 게으른 알고리즘은 Blocking이다.
+	. 한 쓰레드가 lock을 얻은 채로 지연되면, 다른 쓰레드 역시 지연되게 된다. (convoying)
+- 주의
+	. flag를 사용할 때 메모리 업데이트 순서가 중요하므로 volatile
+
+메모리 릭의 해결
+- Free List
+	. Delete하지 않고 모아 놓음
+	  - marking이 해제되는 순간 오작동 가능
+	. 언젠가는 재사용 해야 함
+	  - 아무도 remove된 node를 가리키지 않을 때
+	  - remove 시점에서 중복실행 중인 모든 메소드의 호출이 종료되었을 때
+
+shared_ptr
+- C++11에서 제공하는 일종의 스마트 포인터
+- 객체에 reference counter를 두고 이를 통해 앞으로 쓰이지 않을 객체를 판별해서 자동 삭제
+- reference counter 증감을 atomic하게 구현
+- 그러나 shared_ptr 객체를 load, store하는 것이 atomic이 아니다.
+	. auto curr = prev->next;
+	  다른 쓰레드가 그동안 prev->next를 바꿀 수 있다. 따라서 atomic하지 않다.
+	. 대입 연산자를 실행하기 위해 memory copy를 해야 한다. 이 것이 atomic이 아니다.
+- 해결법 -> load, store를 atomic하게 수행한다.
+	. shraed_ptr<Node> curr = atomic_load(&prev->next);
+	. atomic_exchange(&prev->next, new_node);
+너무 느리다
+- atomic_load와 atomic_exchange가 하나의 lock으로 구현되어 있다.
+	. 프로그램 내부의 모든 atomic_load와 atomic_exchange가 하나의 lock
+-> shared_ptr 각각이 별도의 lock을 갖도록 atomic_shared_ptr을 정의해서 사용한다.
+그래도 느리다
+- atomic_shared_ptr의 access는 느리다.
+	. mutex를 사용하니까. blocking
+	. 세밀한 동기화와 다를 것이 없다.
+-> 효율적인 atomic_shared_ptr가 필요하다.
+	. non-blocking 구현
+
+비멈춤 동기화
 
