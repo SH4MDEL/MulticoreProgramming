@@ -6,234 +6,81 @@
 using namespace std;
 
 constexpr int MAX_THREADS = 32;
+constexpr long long POINTER_MASK = 0xFFFFFFFFFFFFFFFF;
 
-namespace JNH {
-	using namespace std;
+template <typename T>
+class MarkableReference
+{
+public:
+	MarkableReference(T* pointer) : address{ reinterpret_cast<void*>(pointer) }
 
-	template <class T>
-	struct atomic_shared_ptr {
-	private:
-		mutable mutex m_lock;
-		shared_ptr<T> m_ptr;
-	public:
-		bool is_lock_free() const noexcept
-		{
-			return false;
-		}
+	T* GetReference() const 
+	{
+		return reinterpret_cast<T*>(address & ~1);
+	}
+	bool GetMark() const 
+	{
+		return address & 1;
+	}
 
-		void store(shared_ptr<T> sptr, memory_order = memory_order_seq_cst) noexcept
-		{
-			m_lock.lock();
-			m_ptr = sptr;
-			m_lock.unlock();
-		}
+	void SetReference(T* addr) 
+	{
+		address = reinterpret_cast<void*>(addr);
+	}
+	void SetMark(bool mark) 
+	{
+		if (mark) address = address | 1;
+	}
 
-		shared_ptr<T> load(memory_order = memory_order_seq_cst) const noexcept
-		{
-			m_lock.lock();
-			shared_ptr<T> t = m_ptr;
-			m_lock.unlock();
-			return t;
-		}
-
-		operator shared_ptr<T>() const noexcept
-		{
-			m_lock.lock();
-			shared_ptr<T> t = m_ptr;
-			m_lock.unlock();
-			return t;
-		}
-
-		shared_ptr<T> exchange(shared_ptr<T> sptr, memory_order = memory_order_seq_cst) noexcept
-		{
-			m_lock.lock();
-			shared_ptr<T> t = m_ptr;
-			m_ptr = sptr;
-			m_lock.unlock();
-			return t;
-		}
-
-		bool compare_exchange_strong(shared_ptr<T>& expected_sptr, shared_ptr<T> new_sptr, memory_order, memory_order) noexcept
-		{
-			bool success = false;
-			m_lock.lock();
-			shared_ptr<T> t = m_ptr;
-			if (m_ptr.get() == expected_sptr.get()) {
-				m_ptr = new_sptr;
-				success = true;
-			}
-			expected_sptr = m_ptr;
-			m_lock.unlock();
-		}
-
-		bool compare_exchange_weak(shared_ptr<T>& expected_sptr, shared_ptr<T> target_sptr, memory_order, memory_order) noexcept
-		{
-			return compare_exchange_strong(expected_sptr, target_sptr, memory_order);
-		}
-
-		atomic_shared_ptr() noexcept = default;
-
-		constexpr atomic_shared_ptr(shared_ptr<T> sptr) noexcept
-		{
-			m_lock.lock();
-			m_ptr = sptr;
-			m_lock.unlock();
-		}
-
-		shared_ptr<T> operator=(shared_ptr<T> sptr) noexcept
-		{
-			m_lock.lock();
-			m_ptr = sptr;
-			m_lock.unlock();
-			return sptr;
-		}
-
-		void reset()
-		{
-			m_lock.lock();
-			m_ptr = nullptr;
-			m_lock.unlock();
-		}
-
-		atomic_shared_ptr(const atomic_shared_ptr& rhs)
-		{
-			store(rhs);
-		}
-
-		atomic_shared_ptr& operator=(const atomic_shared_ptr& rhs)
-		{
-			store(rhs);
-			return *this;
-		}
-
-		shared_ptr<T>& operator->() {
-			std::lock_guard<mutex> tt(m_lock);
-			return m_ptr;
-		}
-
-		template< typename TargetType >
-		inline bool operator ==(shared_ptr< TargetType > const& rhs)
-		{
-			return load() == rhs;
-		}
-
-		template< typename TargetType >
-		inline bool operator ==(atomic_shared_ptr<TargetType> const& rhs)
-		{
-			std::lock_guard<mutex> t1(m_lock);
-			std::lock_guard<mutex> t2(rhs.m_lock);
-			return m_ptr == rhs.m_ptr;
-		}
-	};
-
-	template <class T> struct atomic_weak_ptr {
-	private:
-		mutable mutex m_lock;
-		weak_ptr<T> m_ptr;
-	public:
-		bool is_lock_free() const noexcept
-		{
-			return false;
-		}
-		void store(weak_ptr<T> wptr, memory_order = memory_order_seq_cst) noexcept
-		{
-			m_lock.lock();
-			m_ptr = wptr;
-			m_lock.unlock();
-		}
-		weak_ptr<T> load(memory_order = memory_order_seq_cst) const noexcept
-		{
-			m_lock.lock();
-			weak_ptr<T> t = m_ptr;
-			m_lock.lock();
-			return t;
-		}
-		operator weak_ptr<T>() const noexcept
-		{
-			m_lock.lock();
-			weak_ptr<T> t = m_ptr;
-			m_lock.unlock();
-			return t;
-		}
-		weak_ptr<T> exchange(weak_ptr<T> wptr, memory_order = memory_order_seq_cst) noexcept
-		{
-			m_lock.lock();
-			weak_ptr<T> t = m_ptr;
-			m_ptr = wptr;
-			m_lock.unlock();
-			return t;
-		}
-
-		bool compare_exchange_strong(weak_ptr<T>& expected_wptr, weak_ptr<T> new_wptr, memory_order, memory_order) noexcept
-		{
-			bool success = false;
-			lock_guard(m_lock);
-
-			weak_ptr<T> t = m_ptr;
-			shared_ptr<T> my_ptr = t.lock();
-			if (!my_ptr) return false;
-			shared_ptr<T> expected_sptr = expected_wptr.lock();
-			if (!expected_wptr) return false;
-
-			if (my_ptr.get() == expected_sptr.get()) {
-				success = true;
-				m_ptr = new_wptr;
-			}
-			expected_wptr = t;
-			return success;
-		}
-
-		bool compare_exchange_weak(weak_ptr<T>& exptected_wptr, weak_ptr<T> new_wptr, memory_order, memory_order) noexcept
-		{
-			return compare_exchange_strong(exptected_wptr, new_wptr, memory_order);
-		}
-
-		atomic_weak_ptr() noexcept = default;
-
-		constexpr atomic_weak_ptr(weak_ptr<T> wptr) noexcept
-		{
-			m_lock.lock();
-			m_ptr = wptr;
-			m_lock.unlock();
-		}
-
-		atomic_weak_ptr(const atomic_weak_ptr&) = delete;
-		atomic_weak_ptr& operator=(const atomic_weak_ptr&) = delete;
-		weak_ptr<T> operator=(weak_ptr<T> wptr) noexcept
-		{
-			m_lock.lock();
-			m_ptr = wptr;
-			m_lock.unlock();
-			return wptr;
-		}
-		shared_ptr<T> lock() const noexcept
-		{
-			m_lock.lock();
-			shared_ptr<T> sptr = m_ptr.lock();
-			m_lock.unlock();
-			return sptr;
-		}
-		void reset()
-		{
-			m_lock.lock();
-			m_ptr.reset();
-			m_lock.unlock();
-		}
-	};
-}
+	bool CAS(long long oldValue, long long newValue)
+	{
+		return atomic_compare_exchange_strong(reinterpret_cast<atomic_llong*>(&address), &oldValue, newValue);
+	}
+private:
+	void* address;
+};
 
 struct Node {
-	Node() : value{ -1 }, next{ nullptr }, removed{ false } {}
-	Node(int v) : value{ v }, next{ nullptr }, removed{ false } {}
-	Node(int v, JNH::atomic_shared_ptr<Node> node) : value{ v }, next{ node }, removed{ false } {}
+	Node() : value{ -1 }, next{ nullptr } {}
+	Node(int v) : value{ v }, next{ nullptr } {}
 
+	Node* GetNext()
+	{
+		return next.GetReference();
+	}
+	Node* GetNext(bool* removed)
+	{
+
+	}
+	bool IsRemoved()
+	{
+		return next.GetMark();
+	}
+
+	void SetRemove()
+	{
+		next.SetMark(true);
+	}
+	void SetNext(Node* p)
+	{
+		next.SetReference(p);
+	}
+
+	bool CAS(Node* oldNode, Node* newNode, bool oldMark, bool newMark)
+	{
+		long long oldValue = reinterpret_cast<long long>(oldNode);
+		if (oldMark) oldValue = oldValue | 1;
+		long long newValue = reinterpret_cast<long long>(newNode);
+		if (newMark) newValue = newValue | 1;
+
+		return next.CAS(oldValue, newValue);
+	}
+
+private:
+	MarkableReference<Node> next;
+
+public:
 	int value;
-	JNH::atomic_shared_ptr<Node> next;
-	volatile bool removed;
-	mutex nlock;
-
-	void lock() { nlock.lock(); }
-	void unlock() { nlock.unlock(); }
 };
 
 struct my_mutex {
@@ -243,10 +90,9 @@ struct my_mutex {
 
 class Set {
 public:
-	Set()
+	Set() : head{ INT_MIN }, tail{ INT_MAX }
 	{
-		head = make_shared<Node>(INT_MIN, tail);
-		tail = make_shared<Node>(INT_MAX, head);
+		head.SetNext(&tail);
 	}
 	~Set()
 	{
@@ -254,28 +100,49 @@ public:
 	}
 	void unsafe_clear()
 	{
-		head->next = tail;
+		auto p = head.GetNext();
+		while (p != &tail) {
+			auto temp = p;
+			p = p->GetNext();
+			delete temp;
+		}
+		head.SetNext(&tail);
+	}
+	void find(int x, Node*& prev, Node*& current)
+	{
+		restart:
+		prev = &head;
+		current = prev->GetNext();
+		while (true) {
+			bool removed;
+			Node* succ = current->GetNext(&removed);
+			while (removed) {
+				if (!prev->CAS(current, succ, false, false)) {
+					goto restart;
+				}
+				current = succ;
+				succ = current->GetNext(&removed);
+			}
+			if (current->value >= x) return;
+			prev = current;
+			current = current->GetNext();
+		}
 	}
 	bool add(int x)
 	{
 		while (true)
 		{
-			shared_ptr<Node> prev = head;
-			shared_ptr<Node> current = prev->next;
-			while (current->value < x)
-			{
-				prev = current;
-				current = current->next;
-			}
-			lock_guard<mutex> prevLock(prev->nlock);
-			lock_guard<mutex> currLock(current->nlock);
-			if (!validate(prev, current)) continue;
+			Node* newNode = new Node(x);
+			Node* prev;
+			Node* current;
+			find(x, prev, current);
 			if (current->value == x) {
+				delete newNode;
 				return false;
 			}
 			else {
-				auto newNode = make_shared<Node>(x, current);
-				prev->next = newNode;
+				newNode->SetNext(current);
+				prev->CAS(current, newNode, false, false);
 				return true;
 			}
 		}
@@ -284,21 +151,16 @@ public:
 	{
 		while (true)
 		{
-			shared_ptr<Node> prev = head;
-			shared_ptr<Node> current = prev->next;
-			while (current->value < x)
-			{
-				prev = current;
-				current = current->next;
-			}
-			lock_guard<mutex> prevLock(prev->nlock);
-			lock_guard<mutex> currLock(current->nlock);
-			if (!validate(prev, current)) {
-				continue;
-			}
+			Node* prev;
+			Node* current;
+			find(x, prev, current);
 			if (x == current->value) {
-				current->removed = true;
+				Node* succ = current->GetNext();
+				current->SetRemove();
+				if (!current->IsRemoved()) continue;
+				
 				prev->next = current->next;
+				//delete current;
 				return true;
 			}
 			else {
@@ -308,30 +170,30 @@ public:
 	}
 	bool contains(int x)
 	{
-		shared_ptr<Node> current = head;
+		Node* current = &head;
 		while (current->value < x) current = current->next;
 		return (current->value == x) && !(current->removed);
 	}
 	void unsafe_print()
 	{
-		auto p = head->next;
+		Node* p = head.next;
 		for (int i = 0; i < 20; ++i) {
 			cout << p->value << ", ";
-			if (p == tail) break;
+			if (p == &tail) break;
 			p = p->next;
 
 		}
 		cout << endl;
 	}
 private:
-	bool validate(const shared_ptr<Node>& prev, const shared_ptr<Node>& curr)
+	bool validate(Node* prev, Node* curr)
 	{
 		return !(prev->removed) && !(curr->removed) && (prev->next == curr);
 	}
 
 private:
-	JNH::atomic_shared_ptr<Node> head;
-	JNH::atomic_shared_ptr<Node> tail;
+	Node head;
+	Node tail;
 };
 
 constexpr auto NUM_TEST = 4000000;
