@@ -53,7 +53,7 @@ struct Node {
 	{
 		return next.GetReference();
 	}
-	Node* GetNext(bool* removed)
+	Node* GetNext(bool* removed)	// atomic하게 읽어야 함.
 	{
 		long long value = next.GetRefMark();
 		*removed = (1 == (value & 0x1));
@@ -139,9 +139,9 @@ public:
 	}
 	bool add(int x)
 	{
+		Node* newNode = new Node(x);
 		while (true)
 		{
-			Node* newNode = new Node(x);
 			Node* prev;
 			Node* current;
 			find(x, prev, current);
@@ -154,8 +154,7 @@ public:
 				if (prev->CAS(current, newNode, false, false)) {
 					return true;
 				}
-				delete newNode;
-				return false;
+				continue;
 			}
 		}
 	}
@@ -173,7 +172,7 @@ public:
 				Node* succ = current->GetNext();
 				if (!current->AttemptMark(succ, true)) continue;
 
-				prev->CAS(current, succ, false, false);
+				prev->CAS(current, succ, false, false);	// 시도하되 실패해도 return
 				//delete current;
 				return true;
 			}

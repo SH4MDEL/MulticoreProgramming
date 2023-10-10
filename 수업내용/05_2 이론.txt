@@ -1,0 +1,32 @@
+합의 객체 (Consensus Object)
+- Non-blocking 알고리즘을 만들기 위한 객체
+
+합의수 (Consensus Number)
+- Non-blocking 알고리즘을 만드는 능력
+
+만능성 (Universality)
+- 모든 알고리즘을 멀티 쓰레드 무대기로 구현할 수 있는가
+
+
+복습
+- 우리가 사용하고 있는 컴퓨터의 메모리는 atomic하지 않다.
+- 하지만 우리는 atomic하게 사용할 수 있다.
+	. atomic<T>를 사용해서 자료구조 T를 atomic하게 사용하도록 컴파일한다.
+	. 적절한 위치에 atomic_thread_fence를 추가한다.
+
+- atomic<point> pos
+	. 돌아는 간다. 쓰지 말자 (내부적으로 global mutex를 사용해서 구현)
+
+
+동기화
+- 자료구조의 동작을 atomic하게 구현하는 것
+
+합의
+- 새로운 동기화 연산을 제공하는 가상의 객체
+- 동기화 연산 : Ttype_t decide(Type_t value)
+- 동작
+	. n개의 쓰레드가 decide를 호출한다.
+	. 각각의 쓰레드는 한번 이하로만 호출한다.
+	. decide는 모든 호출에 대해 같은 값을 반환한다.
+	. decide가 반환하는 값은 전달된 value 중 하나이다.
+	. atomic하고 wait-free로 동작한다.

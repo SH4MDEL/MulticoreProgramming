@@ -266,3 +266,55 @@ Remove에서 고려해야 할 것
 	. 메소드 호출 시(검색 시) 마킹된 노드를 제거하고 진행한다.
 	  - 제거하면서 검색한다.
 	. 찌꺼기 검색의 책임이 Remove()에만 있지 않다.
+
+Lock-Free List의 메모리 릭
+- Lazy와 같다.
+- 메소드 실행 중에 참조하고 있는 노드가 재사용 되는 경우 오동작의 위험성이 매우 높다
+재사용을 위해서는?
+- Free List를 사용한다.
+- shared_ptr를 사용한다.
+
+Free-List
+- Non Blocking에서 사용하기 위해서는 Non Blocking Free List로 구현해야 한다.
+- Free List에 있는 Node 재사용
+	. 재사용하지 않으면 Memory Leak과 다를 바 없다.
+	. 제한 없이 재사용 한다면?
+	  - Remove()에서 넣은 것을 Add()에서 다시 사용
+	  - Free List에 넣지 않고 그냥 delete하는 것과 같다.
+	  - 알고리즘이 오동작 : 검색에서 밟고 지나가는 노드가 다른 곳에 가서 붙는다.
+	  - 안전하게 재사용하려면 모든 쓰레드가 종료했을 때 재사용하면 된다.
+	  - 게임 서버에서는 사용할 수 없다.
+
+메모리 릭의 해결 방법
+- atomic shared_ptr
+- stamped pointer
+- EPOCH
+- Hazard Pointer
+
+shared_ptr
+- Lock-Free List에서 사용 가능한가? -> No
+	. 우리는 합성 포인터 자료구조를 사용하고 있다.
+- 느리다.
+	. 일반적인 포인터의 load, store는 32비트 integer의 load, store와 같다.
+	. 하지만 shared_ptr의 store는 atomic counter의 두 번 업데이트를 필요로 한다.
+	  - 기존 데이터의 counter 감소, 새 데이터의 counter 증가
+- 그래서
+	. 지역 변수는 atomic이 아닌 일반 shared_ptr을 사용한다.
+	. 함수의 파라미터로 const reference를 사용한다.
+- atomic하지 않다.
+	. counter의 관리는 atomic하다.
+	. pointer 자체의 접근이 atomic하지 않다.
+- 그래서
+	. atomic_shared_ptr를 사용한다.
+	. 상용 atomic_shared_ptr를 구매해서 사용한다.
+	. 주의해서 atomic하게 사용한다.
+
+EPOCH
+- 쓰레드가 종료하지 않아도 재사용 가능 여부를 판단할 수 있도록 했다.
+- 재사용 가능하다. -> Remove 된 노드를 Access하는 포인터가 모든 쓰레드에서 존재하지 않는다.
+- 재사용 불가능하다. -> Remove된 노드를 Access하는 쓰레드가 존재해서, 재사용 결과
+  그 노드의 값이 변경될 때 그 쓰레드가 오작동한다.
+- Remove되는 순간에 다른 쓰레드들에서 실행 중인 메소드들이 다 종료하면, Remove된 Node를
+  가리키는 포인터는 존재하지 않는다.
+- Rmove되는 Node에 현재 시간을 저장하고, 모든 쓰레드에서 메소드들의 
+  시작시간과 종료시간을 적으면 판단이 가능하다.
