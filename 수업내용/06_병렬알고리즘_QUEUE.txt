@@ -1,0 +1,28 @@
+풀(POOL)
+- 리스트는 Set 객체
+- Queue와 Stack은 Pool 객체
+- Pool 객체
+	. 같은 아이템의 복수 존재를 허용
+	. Contains() 메소드를 항상 제공하지 않는다.
+	. Get()과 Set() 메소드를 제공한다.
+	. 보통 생산자-소비자 문제의 버퍼로 사용된다.
+
+무제한 무잠금 큐
+- Enqueue의 기본 동작
+	. tail이 가리키는 node에 CAS로 새 노드를 추가
+	. 실패하면 재시도
+	. 성공하면 tail을 이동
+
+- Enqueue
+	. 직관적으로 구현하면
+void enq(int x) {
+	Node *e = new Node(x);
+	while (true) {
+		if (CAS(&tail->next, NULL, &e)) {
+			tail = e;
+			return;
+	. 놀랍게도 Blocking이다.
+	. tail = e; 를 하기 직전에 context switching이 걸리면 모든 쓰레드가 대기하게 된다.
+
+- 해결책
+	. tail의 전진이 모든 쓰레드에서 가능하게 한다.
