@@ -124,15 +124,15 @@ public:
 		current = prev->GetNext();
 		while (true) {
 			bool removed;
-			Node* succ = current->GetNext(&removed);
-			while (removed) {
-				if (!prev->CAS(current, succ, false, false)) {
-					goto restart;
+			Node* succ = current->GetNext(&removed);	// 다음 노드의 정보와 유효성 검사를 한다.
+			while (removed) {							// 다음 노드가 삭제되었다면
+				if (!prev->CAS(current, succ, false, false)) {	// prev 노드의 다음 노드가 current이면 이를 succ(current의 다음 노드)로 변경
+					goto restart;								// 아니면 재시작
 				}
-				current = succ;
-				succ = current->GetNext(&removed);
+				current = succ;							// 다음 노드를 현재 노드로(참조를 통해)
+				succ = current->GetNext(&removed);		// 다음 노드의 정보와 유효성 검사를 한다.
 			}
-			if (current->value >= x) return;
+			if (current->value >= x) return;			// 탐색 성공
 			prev = current;
 			current = succ;
 		}

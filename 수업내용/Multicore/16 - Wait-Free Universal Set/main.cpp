@@ -24,7 +24,7 @@ struct Response {
 struct Node;
 class Consensus {
 public:
-	Consensus() : next{nullptr} {}
+	Consensus() : next{ nullptr } {}
 	Node* decide(Node* p)
 	{
 		Node* old = nullptr;
@@ -48,8 +48,8 @@ struct Node {
 	Node* volatile next;
 	volatile int seq;
 	Consensus decideNext;
-	Node() : next{nullptr}, seq{0} {}
-	Node(Invocation inv) : inv{inv}, next{ nullptr }, seq{ 0 } {}
+	Node() : next{ nullptr }, seq{ 0 } {}
+	Node(Invocation inv) : inv{ inv }, next{ nullptr }, seq{ 0 } {}
 	void clear()
 	{
 		next = nullptr;
@@ -108,11 +108,13 @@ private:
 
 class UnivObject_set {
 private:
+	Node* announce[MAX_THREADS];
 	Node* head[MAX_THREADS];	// 각 쓰레드가 보고 있는 최신 노드?
 	Node tail;
 public:
 	UnivObject_set() {
 		tail.seq = 1;
+		for (int i = 0; i < MAX_THREADS; ++i) announce[i] = &tail;
 		for (int i = 0; i < MAX_THREADS; ++i) head[i] = &tail;
 	}
 	Node* GetMaxNode() {
@@ -127,20 +129,26 @@ public:
 
 	Response apply(Invocation invoc) {
 		int i = GetThreadID();
-		Node* prefer = new Node(invoc); // invoc에 붙이려고 시도하는데 이를 여러 쓰레드에서 반복한다.
-		while (!prefer->seq) {
-			Node* before = GetMaxNode(); // 헤드들이 노드의 끝을 가리키고 있는데 그 중 가장 최신 노드를 골라내자.
-			Node* after = before->decideNext.decide(prefer); // 최신 노드에 prefer를 붙임
-			before->next = after; 
+		announce[i] = new Node(invoc);
+		head[i] = GetMaxNode();
+		while (!announce[i]->seq) {
+			Node* before = head[i];
+			Node* help = announce[((before->seq + 1) % MAX_THREADS)];
+			Node* prefer;
+			if (!help->seq) prefer = help;
+			else prefer = announce[i];
+			Node* after = before->decideNext.decide(prefer);
+			before->next = after;
 			after->seq = before->seq + 1;
 			head[i] = after;
 		}
 		SeqObject_set myObject;
 		Node* current = tail.next;
-		while (current != prefer) {
+		while (current != announce[i]) {
 			myObject.apply(current->inv);
 			current = current->next;
 		}
+		head[i] = announce[i];
 		return myObject.apply(current->inv);
 	}
 
@@ -152,6 +160,7 @@ public:
 			p = p->next;
 			delete t;
 		}
+		for (int i = 0; i < MAX_THREADS; ++i) announce[i] = &tail;
 		for (int i = 0; i < MAX_THREADS; ++i) head[i] = &tail;
 		tail.clear();
 	}
@@ -199,7 +208,7 @@ private:
 	UnivObject_set m_set;
 };
 
-constexpr auto NUM_TEST = 4000;
+constexpr auto NUM_TEST = 40000;
 constexpr auto KEY_RANGE = 1000;
 constexpr int RANGE = 1000;
 Set g_set;
@@ -303,7 +312,7 @@ void WorkerCheck(vector<HISTORY>* history, int num_threads, int tid)
 
 int main()
 {
-	cout << "무잠금 set" << endl;
+	cout << "무대기 만능 객체 set" << endl;
 	for (int num_threads = 1; num_threads <= MAX_THREADS; num_threads *= 2) {
 		vector<thread> v;
 		array<vector <HISTORY>, MAX_THREADS> history;
