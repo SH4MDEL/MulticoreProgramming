@@ -26,6 +26,17 @@ Wait Free 자료구조를 어떻게 만드는가
 - 읽기, 쓰기도 동기화 연산이다.
 - 읽기, 쓰기 말고도 여러가지 연산이 존재한다.
 	. ex) sum += 2
+- 다른 쓰레드와 통신하기 위한 기본 기능
+	. 멀티쓰레드 알고리즘의 핵심
+- CPU의 명령어(또는 그 조합)로 구현
+- Wait-Free로 구현되어 있어야 한다.
+	. 아니면 Non-Blocking 알고리즘에서 사용할 수 없다.
+- 기존 동기화 연산
+	. Load (wait-free)
+	. Store (wait-free)
+	. Lock/Unlock (blocking)
+	. atomic_thread_fence (wait-free)
+- CAS (wait-free)의 추가가 필요
 
 Compare And Set
 - 동기화 연산의 일종
@@ -34,6 +45,24 @@ Compare And Set
 	. 메모리의 값이 expected면 update로 바꾸고 true 리턴
 	. 메모리의 값이 expected가 아니면 false 리턴
 	. 이 동작이 원자적으로 실행
+- atomic load/store로 구현 불가능
+
+
+질문 4
+- 어떻게 CAS로 일반적인 자료구조를 멀티쓰레드 자료구조로 변환하는가?
+- wait-free를 유지하면서
+-> 답 : 알고리즘이 있다.
+	. 모든 기존 자료구조를 wait-free multithread로 변환해 주는 알고리즘이 존재한다.
+
+결론
+- CPU가 제공하는 CAS를 사용하면 모든 싱글쓰레드 알고리즘을 Lock-Free한 멀티쓰레드 알고리즘으로
+  변환할 수 있다.
+
+현실
+- 비효율적이다.
+
+대안
+- 자료구조에 맞추어 최적화된 lock-free 알고리즘을 일일히 개발해야한다.
 
 
 논 블로킹 프로그램을 해야 한다.
