@@ -26,3 +26,38 @@ void enq(int x) {
 
 - 해결책
 	. tail의 전진이 모든 쓰레드에서 가능하게 한다.
+
+
+Dequeue
+- 왜 문제인가
+	. Inqueue가 문제이다.
+	. Inqueue를 하기 위해 큐의 정의를 느슨하게 풀었다. 이것이 문제를 유발한다.
+	. Tail과 Head가 만나는 경우?
+	. Tail이 Enq하는 도중에 Deq가 일어나 Tail이 삭제된 보초노드를 가리키는 순간이 생긴다.
+	. Enq가 전진시킬때까지 기다리면 Blocking이니까 내가 전진시키자.
+
+- head, tail에 계속 CAS를 하면서 업데이트를 한다.
+	. CAS가 head, tail에 반복적으로 실행되며 병행성이 떨어진다.
+	. 큐는 멀티쓰레드 성능향상이 없는 저주받은 자료구조? -> 아니다. 그러나 쉽지 않다
+
+- delete할 때 죽는 이유?
+	. ABA 문제
+
+ABA
+- 논 블로킹 프로그램에서 CAS를 사용하기 때문에 발생하는 문제.
+	. A라는 쓰레드가 Deq를 하고 싶다.
+	. A라는 쓰레드가 CAS를 하려 하는데, B라는 쓰레드도 CAS를 시도한다.
+	. B가 선택받아 A의 CAS가 
+
+해결 방법
+- 포인터를 포인터 + 스탬프로 확장하고 포인터값을 변경할 때마다 스태프 값을 변경시킨다.
+	. 64비트인 경우 몇 개의 비트를 스탬프에 할당
+	. 32비트인 경우 복잡
+- LL, SC 명령의 사용 (Load Linked, Store Conditional) (ARM, Alpha, PowerPC)
+	. 값을 검사하는 것이 아니라 변경 여부를 검사
+	. LL, SC 구조는 CAS보다 우월하다.
+	. CAS는 값만 같으면 성공하지만, LL, SC는 다른 쓰레드가 건드리기만 해도 실패한다.
+	  - 그러나 LL, SC는 wait-free가 불가능하다.
+- Reference Counter를 사용한다.
+	. 다행히 합성포인터가 아니다.
+	. atomic_shared_ptr은 lock-free가 아니다.
