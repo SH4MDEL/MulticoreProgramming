@@ -57,8 +57,8 @@ public:
 	{
 		Node* node = new Node{ x };
 		while (true) {
-			Node* last = tail;
-			Node* next = last->next;
+			Stamp* last = &tail;
+			Node* next = last->GetNext();
 			if (last != tail) continue;
 			if (!next) {
 				if (CAS(&(last->next), nullptr, node)) {
@@ -75,14 +75,14 @@ public:
 	{
 		while (true) {
 			Stamp first;
-			head->atomic_load(&first);
+			head.atomic_load(&first);
 			Stamp last;
-			tail->atomic_load(&last);
-			Node* next = first->GetNext();
-			if (first->GetNext() != head->GetNext()) continue;
+			tail.atomic_load(&last);
+			Node* next = first.GetNext();
+			if (first.GetNext() != head.GetNext()) continue;
 			if (!next) return -1;
-			if (first->GetNext() == last->GetNext()) {
-				CAS(&tail, last->GetNext(), next, last->GetStamp());
+			if (first.GetNext() == last.GetNext()) {
+				CAS(&tail, last.GetNext(), next, last.GetStamp());
 				continue;
 			}
 			int value = next->value;
@@ -93,7 +93,7 @@ public:
 	}
 	void unsafe_print()
 	{
-		Node* p = head->GetNext()->next;
+		Node* p = head.GetNext()->next;
 		for (int i = 0; i < 20; ++i) {
 			if (!p) break;
 			cout << p->value << " ";
@@ -103,8 +103,8 @@ public:
 	}
 	void unsafe_clear()
 	{
-		Node* p = head->GetNext();
-		while (p != tail->GetNext()) {
+		Node* p = head.GetNext();
+		while (p != tail.GetNext()) {
 			Node* t = p;
 			p = p->next;
 			delete t;
@@ -117,19 +117,18 @@ private:
 		Stamp oldStp{ oldPtr, stamp };
 		Stamp newStp{ newPtr, stamp + 1 };
 		return atomic_compare_exchange_strong(
-			reinterpret_cast<atomic_llong*>(ptr),
+			reinterpret_cast<atomic_llong*>(sptr),
 			reinterpret_cast<long long*>(&oldStp),
 			*reinterpret_cast<long long*>(&newStp));
 	}
 
 private:
-	Stamp* volatile head;
-	Stamp* volatile tail;
+	Stamp head;
+	Stamp tail;
 };
 
-constexpr auto NUM_TEST = 10000000;
+constexpr auto NUM_TEST = 4000000;
 constexpr auto KEY_RANGE = 1000;
-constexpr int RANGE = 10000000;
 Queue queue;
 
 void Worker(int num_threads, int threadID)
@@ -146,7 +145,7 @@ void Worker(int num_threads, int threadID)
 
 int main()
 {
-	cout << "큐 : 무제한 무잠금 동기화 (Queue : Lock-Free Stamp Synchronization)" << endl;
+	cout << "큐 : 무제한 무잠금 동기화 (Queue : Lock-Free Stamp Synchronization) 시도횟수 : " << NUM_TEST << endl;
 	for (int num_threads = 1; num_threads <= MAX_THREADS; num_threads *= 2) {
 		vector<thread> v;
 		queue.unsafe_clear();

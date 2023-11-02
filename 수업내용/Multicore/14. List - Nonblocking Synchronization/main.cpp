@@ -205,7 +205,7 @@ private:
 	Node tail;
 };
 
-constexpr auto NUM_TEST = 4000000;
+constexpr auto NUM_TEST = 40000;
 constexpr auto KEY_RANGE = 1000;
 Set set;
 
@@ -284,7 +284,7 @@ void CheckHistory(array<vector<HISTORY>, MAX_THREADS>& history, int num_threads)
 
 void WorkerCheck(vector<HISTORY>* history, int num_threads)
 {
-	for (int i = 0; i < 4000000 / num_threads; ++i) {
+	for (int i = 0; i < NUM_TEST / num_threads; ++i) {
 		int op = rand() % 3;
 		switch (op) {
 		case 0: {

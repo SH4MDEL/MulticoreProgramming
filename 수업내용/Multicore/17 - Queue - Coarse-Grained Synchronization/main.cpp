@@ -86,11 +86,9 @@ constexpr auto NUM_TEST = 4000000;
 constexpr auto KEY_RANGE = 1000;
 Queue queue;
 
-constexpr int RANGE = 10000000;
-
 void Worker(int num_threads, int threadID)
 {
-	for (int i = 0; i < 10000000 / num_threads; i++) {
+	for (int i = 0; i < NUM_TEST / num_threads; i++) {
 		if ((rand() % 2) || i < 32 / num_threads) {
 			queue.enqueue(i);
 		}
@@ -102,7 +100,7 @@ void Worker(int num_threads, int threadID)
 
 int main()
 {
-	cout << "큐 : 성긴 동기화 (Queue : Coarse-Grained Synchronization)" << endl;
+	cout << "큐 : 성긴 동기화 (Queue : Coarse-Grained Synchronization) 시도횟수 : " << NUM_TEST << endl;
 	for (int num_threads = 1; num_threads <= MAX_THREADS; num_threads *= 2) {
 		vector<thread> v;
 		queue.unsafe_clear();
