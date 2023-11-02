@@ -1,79 +1,83 @@
 #include <iostream>
+#include <chrono>
 #include <thread>
-#include <mutex>
 #include <vector>
-#include <array>
+#include <mutex>
 #include <set>
 #include <unordered_set>
+
 using namespace std;
+using namespace chrono;
 
 constexpr int MAX_THREADS = 32;
-constexpr long long POINTER_MASK = 0xFFFFFFFFFFFFFFFF;
 
-
-struct Node {
+class null_mutex {
 public:
-	Node() : value{ -1 }, next{ nullptr } {}
-	Node(int v) : value{ v }, next{ nullptr } {}
-
-private:
-
-
-public:
-	int value;
-	Node* volatile next;
+	void lock() {}
+	void unlock() {}
 };
 
-class Stack {
+class NODE {
 public:
-	Stack() : top{nullptr} {}
-	~Stack()
+	int v;
+	NODE* volatile next;
+	NODE() : v(-1), next(nullptr) {}
+	NODE(int x) : v(x), next(nullptr) {}
+};
+
+class LF_STACK {
+	NODE* volatile top;
+	bool CAS(NODE* old_p, NODE* n_ptr)
 	{
-		//unsafe_clear();
+		return atomic_compare_exchange_strong(
+			reinterpret_cast<volatile atomic_llong*>(&top),
+			reinterpret_cast<long long*>(&old_p),
+			reinterpret_cast<long long>(n_ptr));
 	}
-	void push(int x)
+public:
+	LF_STACK() : top(nullptr) {}
+	~LF_STACK() { clear(); }
+	void Push(int x)
 	{
-		Node* e = new Node{ x };
-		lock_guard<mutex> l(m);
-		e->next = top;
-		top = e;
+		NODE* node = new NODE{ x };
+		while (true) {
+			NODE* tmp = top;
+			node->next = tmp;
+			if (CAS(node->next, node)) return;
+		}
 	}
-	int pop()
+	int Pop()
 	{
-		m.lock();
-		if (!top) { m.unlock(); return -2; }
-		int temp = top->value;
-		Node* ptr = top;
-		top = top->next;
-		m.unlock();
-		delete ptr;
-		return temp;
+		while (true) {
+			NODE* ptr = top;
+			if (!ptr) { return -2; }
+			NODE* next = ptr->next;
+			int temp = ptr->v;
+			if (CAS(ptr, next)) {
+				return temp;
+			}
+		}
 	}
-	void unsafe_print()
+	void print20()
 	{
-		Node* p = top;
+		NODE* p = top;
 		for (int i = 0; i < 20; ++i) {
-			if (!p) break;
-			cout << p->value << " ";
+			if (p == nullptr) break;
+			cout << p->v << ", ";
 			p = p->next;
 		}
 		cout << endl;
 	}
-	void unsafe_clear()
+	void clear()
 	{
-		Node* p = top;
-		while (p) {
-			Node* t = p;
+		NODE* p = top;
+		while (p != nullptr) {
+			NODE* t = p;
 			p = p->next;
 			delete t;
 		}
-		p = nullptr;
 		top = nullptr;
 	}
-
-private:
-	Node* volatile top;
-	mutex m;
 };
 
 thread_local int tls_thid;
@@ -83,9 +87,10 @@ int Thread_id()
 	return tls_thid;
 }
 
-Stack stack;
-constexpr int RANGE = 10000000;
+typedef LF_STACK MY_STACK;
+MY_STACK my_stack;
 
+constexpr int LOOP = 10000000;
 
 struct HISTORY {
 	vector <int> push_values, pop_values;
@@ -96,12 +101,12 @@ atomic_int stack_size = 0;
 void worker(int num_threads, int th_id)
 {
 	tls_thid = th_id;
-	for (int i = 0; i < RANGE / num_threads; i++) {
+	for (int i = 0; i < LOOP / num_threads; i++) {
 		if ((rand() % 2) || i < 128 / num_threads) {
-			stack.push(i);
+			my_stack.Push(i);
 		}
 		else {
-			stack.pop();
+			my_stack.Pop();
 		}
 	}
 }
@@ -109,15 +114,15 @@ void worker(int num_threads, int th_id)
 void worker_check(int num_threads, int th_id, HISTORY& h)
 {
 	tls_thid = th_id;
-	for (int i = 0; i < RANGE / num_threads; i++) {
+	for (int i = 0; i < LOOP / num_threads; i++) {
 		if ((rand() % 2) || i < 128 / num_threads) {
 			h.push_values.push_back(i);
 			stack_size++;
-			stack.push(i);
+			my_stack.Push(i);
 		}
 		else {
 			stack_size--;
-			int res = stack.pop();
+			int res = my_stack.Pop();
 			if (res == -2) {
 				stack_size++;
 				if (stack_size > num_threads) {
@@ -130,16 +135,16 @@ void worker_check(int num_threads, int th_id, HISTORY& h)
 	}
 }
 
-void check_history(Stack& my_stack, vector <HISTORY>& h)
+void check_history(MY_STACK& my_stack, vector <HISTORY>& h)
 {
-	unordered_multiset<int> pushed, poped, in_stack;
+	unordered_multiset <int> pushed, poped, in_stack;
 
 	for (auto& v : h)
 	{
 		for (auto num : v.push_values) pushed.insert(num);
 		for (auto num : v.pop_values) poped.insert(num);
 		while (true) {
-			int num = my_stack.pop();
+			int num = my_stack.Pop();
 			if (num == -2) break;
 			poped.insert(num);
 		}
@@ -156,7 +161,7 @@ void check_history(Stack& my_stack, vector <HISTORY>& h)
 	}
 	for (auto num : poped)
 		if (pushed.count(num) == 0) {
-			std::multiset<int> sorted;
+			std::multiset <int> sorted;
 			for (auto num : poped)
 				sorted.insert(num);
 			cout << "There was elements in the STACK no one pushed : ";
@@ -172,24 +177,23 @@ void check_history(Stack& my_stack, vector <HISTORY>& h)
 
 int main()
 {
-	cout << "스택 : 성긴 동기화 (Stack : Coarse-Grained Synchronization)" << endl;
 	cout << "==== Error Checking =====\n";
 	for (int num_threads = 1; num_threads <= MAX_THREADS; num_threads *= 2) {
 		vector <thread> threads;
 		vector <HISTORY> log(num_threads);
-		stack.unsafe_clear();
+		my_stack.clear();
 		stack_size = 0;
-		auto start_t = chrono::high_resolution_clock::now();
+		auto start_t = high_resolution_clock::now();
 		for (int i = 0; i < num_threads; ++i)
 			threads.emplace_back(worker_check, num_threads, i, ref(log[i]));
 		for (auto& th : threads)
 			th.join();
-		auto end_t = chrono::high_resolution_clock::now();
+		auto end_t = high_resolution_clock::now();
 		auto exec_t = end_t - start_t;
-		auto exec_ms = chrono::duration_cast<chrono::milliseconds>(exec_t).count();
-		stack.unsafe_print();
+		auto exec_ms = duration_cast<milliseconds>(exec_t).count();
+		my_stack.print20();
 		cout << num_threads << " Threads.  Exec Time : " << exec_ms << endl;
-		check_history(stack, log);
+		check_history(my_stack, log);
 	}
 
 	cout << "======== BENCHMARKING =========\n";
@@ -197,17 +201,17 @@ int main()
 	for (int num_threads = 1; num_threads <= MAX_THREADS; num_threads *= 2) {
 		vector <thread> threads;
 		vector <HISTORY> log(num_threads);
-		stack.unsafe_clear();
+		my_stack.clear();
 		stack_size = 0;
-		auto start_t = chrono::high_resolution_clock::now();
+		auto start_t = high_resolution_clock::now();
 		for (int i = 0; i < num_threads; ++i)
 			threads.emplace_back(worker, num_threads, i);
 		for (auto& th : threads)
 			th.join();
-		auto end_t = chrono::high_resolution_clock::now();
+		auto end_t = high_resolution_clock::now();
 		auto exec_t = end_t - start_t;
-		auto exec_ms = chrono::duration_cast<chrono::milliseconds>(exec_t).count();
-		stack.unsafe_print();
+		auto exec_ms = duration_cast<milliseconds>(exec_t).count();
+		my_stack.print20();
 		cout << num_threads << " Threads.  Exec Time : " << exec_ms << endl;
 	}
 }

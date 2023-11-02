@@ -19,20 +19,41 @@ public:
 };
 
 class alignas(8) Stamp {
-	Node* volatile next;
+	Node* volatile node;
 	int value;
 public:
-	Stamp() : next{ nullptr }, value{ 0 } {}
-	Stamp(Node* ptr, int value) : next{ptr}, value{value} {}
-	Node* GetNext() { return next; }
+	Stamp() : node{ nullptr }, value{ 0 } {}
+	Stamp(Node* ptr, int value) : node{ptr}, value{value}
+	{
+	
+	}
+	Node* GetNext() {
+		if (!node) return nullptr;
+		return node->next; 
+	}
 	int GetStamp() { return value; }
-	Stamp operator=(Stamp& rhs) {
-		long long t = *reinterpret_cast<long long*>(&rhs);
+	Stamp& operator=(const Stamp& rhs) {
+		long long t = *reinterpret_cast<long long*>(const_cast<Stamp*>(&rhs));
 		return *reinterpret_cast<Stamp*>(&t);
 	}
-	bool CAS(Node* oldPtr, Node* newPtr, int stamp)
+	bool operator!=(const Stamp& rhs) {
+		return node != rhs.node || value != rhs.value;
+	}
+	void Set(Node* n, int v)
 	{
-
+		node = n;
+		value = v;
+	}
+	void Set(Stamp s)
+	{
+		Node* n = s.GetNext();
+		if (n) node = n;
+		else node = nullptr;
+		value = s.GetStamp();
+	}
+	void Clear()
+	{
+		node = nullptr;
 	}
 	void atomic_load(Stamp* t) {
 		//long long t1 = *reinterpret_cast<long long*>(this);
@@ -47,7 +68,9 @@ class Queue {
 public:
 	Queue()
 	{
-		head = tail = Stamp{ new Node{-1}, 0 };
+		auto n = new Node{ -1 };
+		head.Set(n, 0);
+		tail.Set(n, 0);
 	}
 	~Queue()
 	{
@@ -57,17 +80,19 @@ public:
 	{
 		Node* node = new Node{ x };
 		while (true) {
-			Stamp* last = &tail;
-			Node* next = last->GetNext();
+			Stamp last;
+			//tail.atomic_load(&last);
+			last.Set(tail);
+			Node* next = last.GetNext();
 			if (last != tail) continue;
 			if (!next) {
-				if (CAS(&(last->next), nullptr, node)) {
-					CAS(&tail, last, node);
+				if (CAS(&last, nullptr, node, 0)) {
+					CAS(&tail, last.GetNext(), node, last.GetStamp());
 					return;
 				}
 			}
 			else {
-				CAS(&tail, last, next);
+				CAS(&tail, last.GetNext(), next, last.GetStamp());
 			}
 		}
 	}
@@ -75,9 +100,11 @@ public:
 	{
 		while (true) {
 			Stamp first;
-			head.atomic_load(&first);
+			//head.atomic_load(&first);
+			first.Set(head);
 			Stamp last;
-			tail.atomic_load(&last);
+			//tail.atomic_load(&last);
+			last.Set(tail);
 			Node* next = first.GetNext();
 			if (first.GetNext() != head.GetNext()) continue;
 			if (!next) return -1;
@@ -93,7 +120,7 @@ public:
 	}
 	void unsafe_print()
 	{
-		Node* p = head.GetNext()->next;
+		Node* p = head.GetNext();
 		for (int i = 0; i < 20; ++i) {
 			if (!p) break;
 			cout << p->value << " ";
@@ -104,12 +131,13 @@ public:
 	void unsafe_clear()
 	{
 		Node* p = head.GetNext();
-		while (p != tail.GetNext()) {
+		while (p != nullptr) {
 			Node* t = p;
 			p = p->next;
 			delete t;
 		}
 		head = tail;
+		head.Clear();
 	}
 private:
 	bool CAS(Stamp* sptr, Node* oldPtr, Node* newPtr, int stamp)
@@ -138,7 +166,7 @@ void Worker(int num_threads, int threadID)
 			queue.enqueue(i);
 		}
 		else {
-			queue.dequeue();
+			//queue.dequeue();
 		}
 	}
 }

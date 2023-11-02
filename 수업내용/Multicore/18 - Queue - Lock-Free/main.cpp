@@ -35,15 +35,15 @@ public:
 		while (true) {
 			Node* last = tail;
 			Node* next = last->next;
-			if (last != tail) continue;
-			if (!next) {
-				if (CAS(&(last->next), nullptr, node)) {
-					CAS(&tail, last, node);
+			if (last != tail) continue;	// 다른 작업이 이뤄지지 않았는지 검사
+			if (!next) {				// tail->next가 nullptr이면?
+				if (CAS(&(last->next), nullptr, node)) {	// CAS를 통해 새 노드 끼워넣음
+					CAS(&tail, last, node);					// tail이 last 아직 맞으면 노드로 바꿈
 					return;
 				}
 			}
-			else {
-				CAS(&tail, last, next);
+			else {						// 누군가 tail->next에 뭘 끼워넣었다?
+				CAS(&tail, last, next);	// tail이 last 아직 맞으면 last->next로 바꿈
 			}
 		}
 	}
