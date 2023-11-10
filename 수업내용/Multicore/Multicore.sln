@@ -49,6 +49,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "23. Stack - Lock-Free Elimi
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "22. Stack - Lock-Free BackOff", "22. Stack - Lock-Free BackOff\22. Stack - Lock-Free BackOff.vcxproj", "{EF8CD260-4E30-40AB-B538-83DA531EFC15}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "24. SkipList - Coarse-Grained Synchronization", "24. SkipList - Coarse-Grained Synchronization\24. SkipList - Coarse-Grained Synchronization.vcxproj", "{11F29535-00BC-412A-886C-3CB00B744CA0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -241,6 +243,14 @@ Global
 		{EF8CD260-4E30-40AB-B538-83DA531EFC15}.Release|x64.Build.0 = Release|x64
 		{EF8CD260-4E30-40AB-B538-83DA531EFC15}.Release|x86.ActiveCfg = Release|Win32
 		{EF8CD260-4E30-40AB-B538-83DA531EFC15}.Release|x86.Build.0 = Release|Win32
+		{11F29535-00BC-412A-886C-3CB00B744CA0}.Debug|x64.ActiveCfg = Debug|x64
+		{11F29535-00BC-412A-886C-3CB00B744CA0}.Debug|x64.Build.0 = Debug|x64
+		{11F29535-00BC-412A-886C-3CB00B744CA0}.Debug|x86.ActiveCfg = Debug|Win32
+		{11F29535-00BC-412A-886C-3CB00B744CA0}.Debug|x86.Build.0 = Debug|Win32
+		{11F29535-00BC-412A-886C-3CB00B744CA0}.Release|x64.ActiveCfg = Release|x64
+		{11F29535-00BC-412A-886C-3CB00B744CA0}.Release|x64.Build.0 = Release|x64
+		{11F29535-00BC-412A-886C-3CB00B744CA0}.Release|x86.ActiveCfg = Release|Win32
+		{11F29535-00BC-412A-886C-3CB00B744CA0}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
