@@ -34,7 +34,7 @@ public:
 		while (true) {
 			Node* tmp = top;
 			node->next = tmp;
-			if (CAS(node->next, node)) return;
+			if (CAS(tmp, node)) return;
 		}
 	}
 	int pop()

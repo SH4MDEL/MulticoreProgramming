@@ -37,11 +37,11 @@ class Exchanger {
 	bool CAS(int old_slot, int new_status, int new_value)
 	{
 		return atomic_compare_exchange_strong(
-		reinterpret_cast<volatile atomic_int*>(&slot),
+			reinterpret_cast<volatile atomic_int*>(&slot),
 			&old_slot, new_status | new_value);
 	}
 public:
-	Exchanger() : slot{0} {}
+	Exchanger() : slot{ 0 } {}
 	int exchange(int x, bool* busy)
 	{
 		if (x == -1) {
@@ -115,7 +115,7 @@ class EliminationArray {
 			&old_r, new_r);
 	}
 public:
-	EliminationArray() : range{1} {}
+	EliminationArray() : range{ 1 } {}
 	int visit(int x)
 	{
 		int cur_range = range;
