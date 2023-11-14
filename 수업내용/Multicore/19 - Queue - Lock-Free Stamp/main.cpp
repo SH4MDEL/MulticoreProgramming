@@ -18,7 +18,7 @@ public:
 	Node* next;
 };
 
-class alignas(8) Stamp {
+class alignas(16) Stamp {
 	Node* volatile node;
 	int value;
 public:
