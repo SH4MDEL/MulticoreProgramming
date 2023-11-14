@@ -138,7 +138,7 @@ int Thread_id()
 	return tls_thid;
 }
 
-SkipList<int> set{INT_MIN, INT_MAX};
+SkipList<int> set{ INT_MIN, INT_MAX };
 
 class HISTORY {
 public:
