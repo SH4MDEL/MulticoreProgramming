@@ -20,7 +20,7 @@ public:
 	volatile bool removed;
 	volatile bool fullyLinked;
 
-	Node() : value{}, topLevel{ 0 }, removed{false}, fullyLinked{false}
+	Node() : value{}, topLevel{ 0 }, removed{ false }, fullyLinked{ false }
 	{
 		for (auto& n : next) n = nullptr;
 	}
@@ -134,15 +134,17 @@ public:
 	{
 		Node<T>* prev[MAX_LEVEL + 1];
 		Node<T>* curr[MAX_LEVEL + 1];
-		Node<T>* victim{};
+		Node<T>* victim;
 
 		bool removed = false;
 		int topLevel = -1;
 		while (true) {
 			int findLevel = find(x, prev, curr);
-			if (findLevel != -1) return false;
-			victim = curr[findLevel];
-			if (removed || (victim->fullyLinked && victim->topLevel == findLevel && !victim->removed)) {
+			if (findLevel != -1) victim = curr[findLevel];
+			else return false;
+			if (removed || (findLevel != -1 && 
+				victim->fullyLinked && victim->topLevel == findLevel 
+				&& !victim->removed)) {
 				if (!removed) {
 					topLevel = victim->topLevel;
 					victim->lock();
@@ -154,27 +156,29 @@ public:
 					removed = true;
 				}
 				int highestLocked = -1;
-				bool valid = true;
-				for (int i = 0; valid && i <= topLevel; i++) {
-					auto previous = prev[i];
-					previous->lock();
-					highestLocked = i;
-					valid = !previous->removed && previous->next[i] == victim;
-				}
-				if (!valid) {
+				while (true) {
+					bool valid = true;
+					for (int i = 0; valid && i <= topLevel; i++) {
+						auto previous = prev[i];
+						previous->lock();
+						highestLocked = i;
+						valid = !previous->removed && previous->next[i] == victim;
+					}
+					if (!valid) {
+						for (int i = 0; i <= highestLocked; ++i) {
+							prev[i]->unlock();
+						}
+						victim->unlock();
+						continue;
+					}
+					for (int i = topLevel; 0 <= i; i--)
+						prev[i]->next[i] = victim->next[i];
 					for (int i = 0; i <= highestLocked; ++i) {
 						prev[i]->unlock();
 					}
 					victim->unlock();
-					continue;
+					return true;
 				}
-				for (int i = topLevel; 0 <= i; i--)
-					prev[i]->next[i] = victim->next[i];
-				for (int i = 0; i <= highestLocked; ++i) {
-					prev[i]->unlock();
-				}
-				victim->unlock();
-				return true;
 			}
 			return false;
 		}
@@ -227,8 +231,8 @@ public:
 		Node<T>* curr[MAX_LEVEL + 1];
 
 		int findLevel = find(x, prev, curr);
-		return (findLevel != -1) && 
-			(!curr[findLevel]->removed) && 
+		return (findLevel != -1) &&
+			(!curr[findLevel]->removed) &&
 			(curr[findLevel]->fullyLinked);
 	}
 	void print()
