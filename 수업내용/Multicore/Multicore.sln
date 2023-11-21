@@ -53,6 +53,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "24. SkipList - Coarse-Grain
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "25. SkipList - Lazy Synchronization", "25. SkipList - Lazy Synchronization\25. SkipList - Lazy Synchronization.vcxproj", "{B0FDAFD1-9ED5-46A4-9E73-248E61874E69}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "26. SkipList - Lock-Free", "26. SkipList - Lock-Free\26. SkipList - Lock-Free.vcxproj", "{983B426F-2FBE-4758-816D-BF1232404687}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -261,6 +263,14 @@ Global
 		{B0FDAFD1-9ED5-46A4-9E73-248E61874E69}.Release|x64.Build.0 = Release|x64
 		{B0FDAFD1-9ED5-46A4-9E73-248E61874E69}.Release|x86.ActiveCfg = Release|Win32
 		{B0FDAFD1-9ED5-46A4-9E73-248E61874E69}.Release|x86.Build.0 = Release|Win32
+		{983B426F-2FBE-4758-816D-BF1232404687}.Debug|x64.ActiveCfg = Debug|x64
+		{983B426F-2FBE-4758-816D-BF1232404687}.Debug|x64.Build.0 = Debug|x64
+		{983B426F-2FBE-4758-816D-BF1232404687}.Debug|x86.ActiveCfg = Debug|Win32
+		{983B426F-2FBE-4758-816D-BF1232404687}.Debug|x86.Build.0 = Debug|Win32
+		{983B426F-2FBE-4758-816D-BF1232404687}.Release|x64.ActiveCfg = Release|x64
+		{983B426F-2FBE-4758-816D-BF1232404687}.Release|x64.Build.0 = Release|x64
+		{983B426F-2FBE-4758-816D-BF1232404687}.Release|x86.ActiveCfg = Release|Win32
+		{983B426F-2FBE-4758-816D-BF1232404687}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
