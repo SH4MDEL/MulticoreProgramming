@@ -1,0 +1,27 @@
+- C++11
+- OpenMP
+- Indel Thread Building Block
+- CUDA
+- Transactional Memory
+- 새로운 언어
+
+C++11
+- 성능 때문에 다루지 않은 것들
+	. 시스템 호출로 구현되기 때문에 또는 Blocking으로 구현되므로
+	. condition_variable, future, promise, async
+	. coroutine
+	  - 생성, 소멸 부하가 적다.
+
+OpenMP
+- C와 C++, FORTRAN에서 병렬프로그램을 가능하게 해주는 API
+- 내부적으로 멀티쓰레드, 공유메모리를 사용한다.
+- 컴파일러 디렉티브와 함수, 변수로 구성되어 있다.
+	. 컴파일러 디렉티브: 컴파일러에게 요청(pragma pack, pragma once)
+- 표준으로 지정되어있어서 대부분의 컴파일러에서 구현되어 있다.
+
+특징
+- 분산 메모리(분산 컴퓨터)에서는 사용할 수 없다.
+- 최상의 공유메모리 사용 패턴을 보장하지 않는다.
+- Data Dependency, Data Race, Deadlock 검사는 프로그래머가 해야 한다.
+- 컴파일러가 알아서 기존 프로그램을 병렬로 변환해 주지 않는다.
+  어느 부분을 어떻게 병렬화할지를 프로그래머가 지정해 주어야 한다.

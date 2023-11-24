@@ -3140,7 +3140,7 @@ public:
 
 	bool ADD(int x)
 	{
-		SKNODE* prev[MAX_LEVEL + 1], * curr[MAX_LEVEL + 1];
+		SKLFNODE* prev[MAX_LEVEL + 1], * curr[MAX_LEVEL + 1];
 		Find(x, prev, curr);
 		if (curr[0]->v != x) {
 			int level = 0;
@@ -3149,7 +3149,7 @@ public:
 				if (MAX_LEVEL == level)
 					break;
 			}
-			SKNODE* node = new SKNODE{ x, level };
+			SKLFNODE* node = new SKLFNODE{ x, level };
 			for (int i = 0; i <= level; ++i) {
 				node->next[i] = curr[i];
 				prev[i]->next[i] = node;
