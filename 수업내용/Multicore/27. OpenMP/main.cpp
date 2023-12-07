@@ -49,7 +49,6 @@ int main()
 #pragma omp parallel shared(sum)
 	{
 #pragma omp for schedule(dynamic, 100000) nowait
-
 		for (int i = 0; i < 50'000'000 / num_threads; ++i) {
 #pragma omp critical
 			sum += 2;
