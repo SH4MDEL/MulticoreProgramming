@@ -99,7 +99,7 @@ CUDA
 
 GPGPU
 - CPU의 몇 십 배의 속도가 가능
-	. 계산량이 많을 경우
+	. floating point가 많고 계산량이 많을 경우
 단점
 - 낮은 I/O 및 직렬 계산 속도
 	. CPU와 GPU 사이의 병목 현상
@@ -110,6 +110,8 @@ GPGPU
 
 
 Transactional Memory
+- 지금까지의 모든 단점들을 보완하기 위하여 고안된 새로운 프로그래밍 모델
+- CUDA의 Blocking, NonBlocking 알고리즘 모두 단점 존재
 병렬 하드웨어
 - Hyper Thread
 - Big - Little CPU
@@ -163,6 +165,7 @@ Lock-Free 알고리즘의 한계
 	. memory ordering 문제까지 겹치면 정말 어렵다.
 
 트랜잭션(Transaction)
+- 지금까지의 모든 단점들을 보완하기 위하여 고안된 새로운 프로그래밍 모델
 - 하나의 쓰레드가 실행하는 일련의 프로그램 블록(임계 영역) -> 트랜잭션으로 정의
 - 각각의 트랜잭션은 atomic하다.
 	. 한 번에 하나씩 실행된 것처럼 보여야 한다.
@@ -171,3 +174,131 @@ Lock-Free 알고리즘의 한계
 
 복사본과 원본 사이에 차이가 있나 확인한다.
 차이가 있으면 실행을 무효화한다.
+
+트랜잭션의 동작
+-<투기적(Speculative) 실행>
+	. "안되면 말고"
+- 하나의 트랜잭션에 속하는 모든 메모리 연산은 임시적(tentative)으로 실행
+- 트랜잭션의 실행이 끝난 후 동기화 충돌 검사
+- 충돌이 없으면 임시적 실행을 영구화 한다.
+	. Commit
+- 충돌이 있었으면 모든 실행을 무효화 한다.
+	. Abort
+- 이들을 잘(LockFree로) 구현해야 한다.
+
+(옵션) 트랜잭션(transaction)의 중첩
+- 트랜잭션 안에 트랜잭션
+- Child 트랜잭션의 Abort가 Parent를 Abort시키지 않음.
+
+void enq(int x) {
+	Node *e = new Node(x);
+	atomic {
+		tail->next = e;
+		tail = e;
+	}
+}
+누군가 atomic 구역이 실행되는 동안 충돌을 일으키면, 무효화하고 다시 실행한다.
+
+Software Transaction Memory
+구현 아이디어
+- 모든 공유 메모리접근을 Transactional Memory 모듈을 통해서 수행
+- 성능을 위해 트랜잭션 종료 시 충돌 검사 수행
+- 충돌 시 Undo
+	. 이를 위해 Undo 및 Redo 리스트 (Update List) 관리
+- Transaction의 state : ACTIVE, COMMIT, ABORTED로 관리
+
+Software Transaction Memory 구현 이슈
+- 좀비 트랜잭션
+	. 동기화 충돌 이후에도 트랜잭션이 계속 실행된다.
+	. 충돌 결과 원래는 불가능한 값을 갖게 될 수 있다.
+	  - 무한루프
+	  - 예외상황 발생
+	. 충돌을 발견한 시점에서 Abort를 잘 하면 문제가 없는데, 성능 때문에 충돌 감지 횟수를
+	  줄여 성능을 올리기 위한 로직이 문제가 된다.
+	. 잘못된 결과가 나오는데 잘못된 값을 통해 루한루프에 빠지거나 예외상황이 발생할 수 있다.
+	. 그래도 Lock-Free 구현 보다는 쉽다.
+- 성능
+	. 모든 Read/Write를 API를 통해서 해야 하므로 성능이 좋지 않다.
+	. 코어의 개수가 매우 많아야 제대로 성능이 나온다.
+
+Hardware Transaction Memory
+- Cache 일관성 프로토콜을 수정해서 구현
+- SUN의 Rock Processor (SUN이 망함)
+- Intel의 x86 (Haswell부터)
+구현
+- 캐시의 태그에 Transaction bit 추가
+- Transaction 메모리 연산은 transaction cache line에 한다.
+- Transaction Cache Line이 Invalidate되면 cache line을 메모리에 쓰지 않고 폐기한다.
+	. CPU의 실행도 Abort한다
+	. 백업해둠
+	. Transaction Bit가 1인 캐시를 전부 무효화한다.
+
+- 복수 개의 메모리에 대한 Transaction을 허용한다.
+	. L1 캐시의 용량 한도까지 (32KB)
+- CPU에서 Transaction 실패시의 복구를 제공한다.
+	. 메모리와 레지스터의 변경을 모두 Roll-Back한다.
+
+- 트랜잭션이 실패했을 때를 대비하기 위함이다
+
+장점
+- 생산성
+	. 싱글쓰레드 알고리즘을 그대로 사용 가능(하지는 않고 조금 바꿔야 함)
+	  - 성능 향상을 위해 접근하는 공유메모리의 개수를 줄여야 함.
+	  - 성능 향상을 위해 트랜잭션의 실행 시간을 단축시켜야 함.
+	  - 시스템 호출 제거
+	. 프로그래밍이 쉽다. (Lock-Free 알고리즘보다는 매우 간단함)
+- 확장성
+	. 여러 공유 객체 연결에 제한이 없음
+- 정확성
+	. 제대로 동작하는 알고리즘이라는 것을 검증하기가 쉬움
+- 성능
+	. Lock-Free에 근접한 성능
+	. 하지만 충돌이 심한 경우 성능 저하
+
+STM 단점
+- 성능
+	. 오버헤드가 커서 Core가 매우 많지 않으면 오히려 성능 저하
+HTM 단점
+- 범용성
+	. 일부 CPU에서만 지원 (ARM, AMD, 모바일 X)
+- 제한성
+	. HW 용량의 한계로 알고리즘이 제한됨
+	  - 성공이 불가능할 것을 대비한 대체 실행 프로그램 필요(아마도 Blocking)
+	. Coarse Grain과 Lock-Free 중간 정도의 작성 난이도
+	. High Contention 상황에서 Lock-Free보다 성능 저하
+- 한계
+	. Core의 개수가 많아질 경우 성능향상의 한계가 찾아옴
+
+Haswell HTM의 한계
+- 모든 알고리즘에 적용 불가능
+	. HW 용량 한계 -> 알고리즘의 맞춤형 수정 필요
+	. Nested Transaction 불가능 (가능하지만 무조건 몽땅 Roll-Back)
+- 오버헤드
+	. 모든 레지스터 내용 저장 및 Roll-Back
+
+미래
+- 쓰레드가 많아질수록 충돌확률이 올라가 TM의 성능이 떨어진다.
+- 64Core(100~200Core?) 정도가 한계일 것이라고 예측하고 있다.
+
+
+
+새로운 언어
+
+Go
+- 언어에서 멀티쓰레드 지원
+	. Goroutine : SW Thread지만 Kernel Thread Pool에서 병렬로 동작
+	. 공유 메모리 모델 : Data Race 존재, mutex 필요
+- 멀티쓰레드 문제에 대한 대책 : Channel
+	. Goroutine 사이의 고속통신, 공유 메모리 대신 사용
+
+하스켈
+- 순수 함수형 언어로 1990년에 개발
+- 개념은 뛰어나나 난이도로 인해 많이 사용되지 못하고 있음
+- 병렬성
+	. 순수 병렬성(Parallelism)
+	  - 언어에 내재된 병렬성 이용, 항상 같은 결과값
+	  - Data Race나 Deadlock이 없음
+	    I/O 처리 안됨
+	. 동시 실행성 (Concurrency)
+	  - I/O 처리를 위해 사용. I/O 실행순서 제어는 프로그래머가 해줘야 함.
+	  - Data Race나 Deadlock이 가능.
