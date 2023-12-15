@@ -79,12 +79,19 @@ TBB
 	. 특히 람다
 
 TBB의 기능들
+- Loop Parallelizer
+	. #pragma를 사용하지 않고 고유의 함수를 사용
+- Containers
+	. STL과 유사한 형태의 멀티쓰레드 Non-Blocking Container를 제공
+- Mutual Exclusion
+	. 다양한 형태의 Lock을 제공
 - 메모리 일관성 지시
 	. 지원에서 제거됨
 	. C++의 memory_order를 사용하는 것이 낫다.
 - 메모리 할당자
 	. 멀티쓰레드 상에서의 효율적인 메모리 할당자
 	. 기존의 메모리 할당자를 교체
+- Task 스케줄링
 
 Loop Parallelizer(루프 병렬화?)
 - OpenMP처럼 #pragma 형태가 아니므로 사용자가 Loop를
@@ -92,10 +99,60 @@ Loop Parallelizer(루프 병렬화?)
 	. 루프의 범위를 지정할 수 있어야 한다.
 	. TBB가 호출할 operator를 등록해야 한다.
 
+concurrent_unordered_map
+- STL의 unordered_map과 비슷
+- insert, find, count, size, at이 쓰레드 안전하다.
+- erase가 쓰레드 안전하지 않다.
+	. 따라서 데이터를 넣었다 뺐다 하는 용도로는 사용할 수 없다.
+
+concurrent_hash_map
+- find, insert, remove 메소드를 제공한다.
+- 멀티쓰레드 환경에서는 컨테이너의 접근이 수시로 변할 수 있으므로 모든 자료 접근은 accessor를 통해 이루어진다.
+	. accessor는 일종의 스마트 포인터이다.
+	. 읽기만 하고 수정하지 않을 경우 const_accessor를 사용하는 것이 좋다.
+
+concurrent_vector
+- push_back, grow_by, grow_to_at_least, size 메소드를 제공한다.
+- clear 메소드는 병렬수행이 불가능하니 다른 메소드와 동시에 호출되지 않도록 해야 한다.
+- 원소들이 연속된 주소에 있지 않으므로 일반적인 pointer 연산은 불가능하다.
+- 원소를 읽을 때 원소가 생성 중일 수 있으므로 읽기 전에 생성완료를 확인하도록 프로그래밍 해야 한다.
+
+concurrent_queue
+- push, try_pop 메소드를 제공한다.
+- try_pop을 제공하는 이유는 empty 호출이 pop의 성공을 보장하지 않기 때문이다.
+
+Mutual Exclusion
+- scoped_lock (C++11의 lock_guard)
+	. lock을 선언하면 선언된 블록을 빠져 나올때 자동적으로 unlock이 된다.
+	  - 예외상황 프로그래밍 편리
+	  - 실수로 unlock을 하지 않는 경우 제거
+	. C++17의 std::scoped_lock과는 다르다
+- 다양한 locking을 지원한다.
+- RWlocking을 지원한다.
+	. 이름에 _rw_가 붙어 있다.
+	. C++14의 shared_lock과 동일
+
+TBB Mutual Exclusion 종류
+- Scalable : Busy waiting을 없애 CPU낭비를 막는다. Overhead가 크다.
+- Fair : Critical Section에 도착한 순서대로 Lock을 얻는다.
+- Recursive : 같은 쓰레드는 lock을 다중으로 얻을 수 있다. Recursive 알고리즘에서 편리
+- Long wait : 오래 기다리고 있을 경우
+	. yield : 같은 프로세스의 다른 쓰레드 실행
+	. block : 깨워 줄 때까지 멈춤
+
+메모리 할당자
+- STL의 std::allocator와 유사한 memory allocator template 제공
+	. scalable_allocator<T>, cache_aligned_allocator<T>
+- 직렬 프로그램에서 고안된 memory allocator들은 single share pool에 동시에 하나의 쓰레드만 접근 가능한 문제가 있다.
+	. scalable_allocator<T>는 이러한 병목 현상을 피할 수 있게 해준다.
+- 두 개의 쓰레드가 같은 cache line을 사용할 때 문제가 있다.
+	. cache_aligned_allocator<T>는 잘못된 cache line 공유를 막아주는 것을 보장.
+
 
 CUDA
 - GPU 성능이 향상함에 따라 HLSL을 계산에 사용
 - DX12 컴퓨트 셰이더 없이 GPU를 계산에 활용할 수 있도록 하자.
+- NVIDIA 하드웨어만 지원
 
 GPGPU
 - CPU의 몇 십 배의 속도가 가능
@@ -129,7 +186,7 @@ Transactional Memory
 
 Blocking
 - 직관적이다.
-- 병렬성이 없다.
+- 병렬성이 없다. => 성능개선의 여지가 없다.
 - 의도하지 않은 멈춤현상을 야기한다.
 	. 우선순위 역전
 	  - 높은 우선순위의 쓰레드가 잠금이 없어서 실행되지 못함
@@ -154,6 +211,12 @@ Non-Blocking
 	. 여러 개의 Word의 변경을 원자적으로 할 수 있으면 알고리즘의 구현이 훨씬 쉬워진다.
 
 Lock-Free 알고리즘의 한계
+- multiCAS?
+	. 그런 것은 존재하지 않는다.
+- SingleCAS를 사용한 구현
+	. 여러 단계의 singleCAS를 사용해서 구현해야 할 필요가 생기고
+	. 연속된 singleCAS 실행 사이에 다른 쓰레드에서 어떠한 행동을 하더라도 제대로 동작하게 만드는 것은 힘들다.
+	  - 다른 쓰레드의 행동을 제한하면 Lock-Free가 깨진다.
 - Lock-Free 구현은 확장성이 떨어진다.
 	. Queue에 Copy() 메소드 추가
 	. Set에 Clear() 메소드 추가
@@ -184,7 +247,7 @@ Lock-Free 알고리즘의 한계
 	. Commit
 - 충돌이 있었으면 모든 실행을 무효화 한다.
 	. Abort
-- 이들을 잘(LockFree로) 구현해야 한다.
+- 이들을 잘(LockFree) 구현해야 한다.
 
 (옵션) 트랜잭션(transaction)의 중첩
 - 트랜잭션 안에 트랜잭션
